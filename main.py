@@ -65,6 +65,15 @@ Link:
         found = True
 
 if not found:
+    message = """
+✅ GPT Monitoring Hub
+
+ตรวจแล้ว แต่ยังไม่พบรายการที่ตรงกับเงื่อนไขวันนี้
+
+สถานะ:
+No relevant alert found.
+"""
+    send_telegram(message)
     print("No relevant alert found.")
 else:
     print("Relevant alert sent.")
