@@ -1,9 +1,10 @@
+import os
 import requests
 
-BOT_TOKEN = "8801312116:AAGWFN1wj5EDglZQ3DsYE0IhzhHQRkSabOg"
-CHAT_ID = "8750288749"
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-message = "🚀 GPT Monitoring Hub Started Successfully"
+message = "✅ GPT Monitoring Hub: Secret setup completed"
 
 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
