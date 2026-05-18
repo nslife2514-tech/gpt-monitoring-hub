@@ -2,6 +2,8 @@ name: GPT Monitoring Hub Alert
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '30 23 * * *'
 
 jobs:
   send-alert:
