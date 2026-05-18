@@ -42,7 +42,16 @@ for entry in feed.entries[:10]:
 
     matched_keywords = [kw for kw in KEYWORDS if kw in text_to_check]
 
-    if matched_keywords:
+        if matched_keywords:
+
+        status = "ℹ News Layer"
+
+        if ".pdf" in link.lower() or "/pdf/" in link.lower():
+            status = "⚠ Pending Verification"
+
+        if "ratchakitcha.soc.go.th" in link.lower():
+            status = "⚠ Pending Verification"
+
         message = f"""
 ⚠ GPT Monitoring Hub
 
@@ -55,8 +64,7 @@ Keyword ที่พบ:
 {", ".join(matched_keywords)}
 
 สถานะ:
-ℹ Search Layer Alert
-ยังไม่ได้ยืนยัน PDF ราชกิจจาฯ
+{status}
 
 Link:
 {link}
