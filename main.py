@@ -1,6 +1,7 @@
 import os
 import requests
 import feedparser
+from datetime import datetime, timezone, timedelta
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -22,6 +23,11 @@ KEYWORDS = [
     "วัตถุอันตราย",
     "สารเคมี"
 ]
+
+
+def thai_now():
+    tz_th = timezone(timedelta(hours=7))
+    return datetime.now(tz_th).strftime("%d/%m/%Y %H:%M")
 
 
 def send_telegram(message):
@@ -51,9 +57,15 @@ def detect_status(link):
 
 
 def main():
+    run_time = thai_now()
+
     feed = feedparser.parse(RSS_URL)
 
+    source_status = "✅ RSS ตรวจสำเร็จ"
+    total_entries = len(feed.entries)
+
     found = False
+    alert_count = 0
 
     for entry in feed.entries[:10]:
         title = entry.title
@@ -88,20 +100,37 @@ Link:
 """
 
             send_telegram(message)
+
             found = True
+            alert_count += 1
 
-    if not found:
-        message = """
-✅ GPT Monitoring Hub
+    heartbeat = f"""
+💓 GPT Monitoring Hub
 
-ตรวจแล้ว แต่ยังไม่พบรายการที่ตรงกับเงื่อนไขวันนี้
+Daily System Check: OK
+
+เวลา:
+{run_time}
+
+ผลการตรวจ:
+✅ GitHub Actions ทำงาน
+{source_status}
+✅ Telegram ส่งสำเร็จ
+
+จำนวนรายการที่ตรวจจาก RSS:
+{total_entries}
+
+จำนวน Alert ที่เข้าเงื่อนไข:
+{alert_count}
 
 สถานะ:
-No relevant alert found.
+{"พบรายการที่เกี่ยวข้อง" if found else "ไม่พบ Alert สำคัญวันนี้"}
+
+System Status:
+ONLINE
 """
 
-        send_telegram(message)
-        print("No relevant alert found.")
+    send_telegram(heartbeat)
 
 
 if __name__ == "__main__":
