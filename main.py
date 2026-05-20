@@ -1,12 +1,15 @@
 import os
 import requests
 import feedparser
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 RSS_URL = "https://news.google.com/rss/search?q=ราชกิจจานุเบกษา&hl=th&gl=TH&ceid=TH:th"
+
+ROYAL_GAZETTE_URL = "https://ratchakitcha.soc.go.th/"
 
 KEYWORDS = [
     "โรงงาน",
@@ -21,7 +24,15 @@ KEYWORDS = [
     "พลังงาน",
     "ก๊าซ",
     "วัตถุอันตราย",
-    "สารเคมี"
+    "สารเคมี",
+    "สถาปนิก",
+    "วิศวกร",
+    "วิชาชีพ",
+    "สภาสถาปนิก",
+    "สภาวิศวกร",
+    "มาตรฐาน",
+    "ใบอนุญาต",
+    "พัฒนาวิชาชีพ"
 ]
 
 
@@ -40,14 +51,16 @@ def send_telegram(message):
 
     response = requests.post(url, data=data)
 
-    print("Telegram status:", response.status_code)
-    print(response.text)
+    print("Telegram:", response.status_code)
 
 
 def detect_status(link):
     link_lower = link.lower()
 
-    if ".pdf" in link_lower or "/pdf/" in link_lower:
+    if ".pdf" in link_lower:
+        return "⚠ Pending Verification"
+
+    if "/pdf/" in link_lower:
         return "⚠ Pending Verification"
 
     if "ratchakitcha.soc.go.th" in link_lower:
@@ -56,53 +69,123 @@ def detect_status(link):
     return "ℹ News Layer"
 
 
-def main():
-    run_time = thai_now()
+def check_rss_layer():
+    alerts = []
 
     feed = feedparser.parse(RSS_URL)
 
-    source_status = "✅ RSS ตรวจสำเร็จ"
-    total_entries = len(feed.entries)
+    for entry in feed.entries[:20]:
 
-    found = False
-    alert_count = 0
-
-    for entry in feed.entries[:10]:
         title = entry.title
         link = entry.link
 
-        text_to_check = title
-
         matched_keywords = [
             kw for kw in KEYWORDS
-            if kw in text_to_check
+            if kw in title
         ]
 
         if matched_keywords:
+
             status = detect_status(link)
 
-            message = f"""
+            alerts.append({
+                "source": "Google RSS",
+                "title": title,
+                "link": link,
+                "keywords": matched_keywords,
+                "status": status
+            })
+
+    return alerts, len(feed.entries)
+
+
+def check_royal_gazette_direct():
+
+    alerts = []
+
+    try:
+        response = requests.get(
+            ROYAL_GAZETTE_URL,
+            timeout=20
+        )
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        text = soup.get_text("\n")
+
+        lines = text.splitlines()
+
+        for line in lines:
+
+            line = line.strip()
+
+            if len(line) < 20:
+                continue
+
+            matched_keywords = [
+                kw for kw in KEYWORDS
+                if kw in line
+            ]
+
+            if matched_keywords:
+
+                alerts.append({
+                    "source": "Royal Gazette Direct",
+                    "title": line,
+                    "link": ROYAL_GAZETTE_URL,
+                    "keywords": matched_keywords,
+                    "status": "⚠ Pending Verification"
+                })
+
+    except Exception as e:
+        print("Royal Gazette check error:", e)
+
+    return alerts
+
+
+def main():
+
+    run_time = thai_now()
+
+    total_alerts = []
+
+    rss_alerts, rss_count = check_rss_layer()
+    total_alerts.extend(rss_alerts)
+
+    rg_alerts = check_royal_gazette_direct()
+    total_alerts.extend(rg_alerts)
+
+    sent_titles = set()
+
+    for alert in total_alerts:
+
+        if alert["title"] in sent_titles:
+            continue
+
+        sent_titles.add(alert["title"])
+
+        message = f"""
 ⚠ GPT Monitoring Hub
 
 พบข้อมูลที่อาจเกี่ยวข้องกับงานวิศวกรรม / โรงงาน / ความปลอดภัย
 
-หัวข้อ:
-{title}
+Source:
+{alert["source"]}
 
-Keyword ที่พบ:
-{", ".join(matched_keywords)}
+หัวข้อ:
+{alert["title"]}
+
+Keyword:
+{", ".join(alert["keywords"])}
 
 สถานะ:
-{status}
+{alert["status"]}
 
 Link:
-{link}
+{alert["link"]}
 """
 
-            send_telegram(message)
-
-            found = True
-            alert_count += 1
+        send_telegram(message)
 
     heartbeat = f"""
 💓 GPT Monitoring Hub
@@ -114,17 +197,18 @@ Daily System Check: OK
 
 ผลการตรวจ:
 ✅ GitHub Actions ทำงาน
-{source_status}
+✅ RSS ตรวจสำเร็จ
+✅ Royal Gazette Direct Layer ตรวจสำเร็จ
 ✅ Telegram ส่งสำเร็จ
 
-จำนวนรายการที่ตรวจจาก RSS:
-{total_entries}
+จำนวนรายการ RSS:
+{rss_count}
 
-จำนวน Alert ที่เข้าเงื่อนไข:
-{alert_count}
+จำนวน Alert:
+{len(sent_titles)}
 
 สถานะ:
-{"พบรายการที่เกี่ยวข้อง" if found else "ไม่พบ Alert สำคัญวันนี้"}
+{"พบรายการที่เกี่ยวข้อง" if sent_titles else "ไม่พบ Alert สำคัญวันนี้"}
 
 System Status:
 ONLINE
